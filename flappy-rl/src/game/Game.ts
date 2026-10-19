@@ -3,9 +3,12 @@ import {
   closestUpcomingPipeIndex,
   createRandomPipe,
   prunePipes,
-  shiftPipes,
 } from './Pipe';
-import { checkCrash, computeDistances } from './physics';
+import {
+  checkCrash,
+  computeDistances,
+  currentHorizontalSpeed,
+} from './physics';
 import {
   DEFAULT_CONFIG,
   type Action,
@@ -14,21 +17,23 @@ import {
   type PipePair,
 } from './types';
 
-/**
- * Moteur de jeu discret (logique pure, sans DOM).
- * Équivalent JS de FlappyBirdLogic + environnement gym.
- */
 export class Game {
-  readonly config: GameConfig;
+  config: GameConfig;
   readonly bird: Bird;
   pipes: PipePair[] = [];
   score = 0;
   lastAction: Action = 0;
+  horizontalSpeed: number;
 
   constructor(config: Partial<GameConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.bird = new Bird(this.config);
+    this.horizontalSpeed = this.config.baseHorizontalSpeed;
     this.reset();
+  }
+
+  applyConfig(partial: Partial<GameConfig>): void {
+    this.config = { ...this.config, ...partial };
   }
 
   reset(): void {
@@ -36,41 +41,48 @@ export class Game {
     this.pipes = [createRandomPipe(this.config)];
     this.score = 0;
     this.lastAction = 0;
+    this.horizontalSpeed = this.config.baseHorizontalSpeed;
   }
 
   /**
-   * Un tick : action → déplacement tuyaux → mouvement oiseau → collision → score.
-   * @returns true si l'oiseau est encore en vie
+   * Un tick: azione → scroll tubi (velocità crescente) → uccello → collisioni.
    */
   step(action: Action): boolean {
     this.lastAction = action;
-    const { width } = this.config;
+    this.horizontalSpeed = currentHorizontalSpeed(this.score, this.config);
 
-    // Spawn d'un nouveau tuyau quand le premier passe le milieu
+    const prevXs = new Map(this.pipes.map((p) => [p.id, p.x]));
+
     if (
-      this.pipes.length > 0 &&
-      this.pipes[0].x === Math.floor(width / 2) - 1
+      this.pipes.length === 0 ||
+      this.pipes[this.pipes.length - 1].x <=
+        this.config.width - 1 - this.config.pipeSpacing
     ) {
       this.pipes.push(createRandomPipe(this.config));
     }
 
-    shiftPipes(this.pipes);
+    for (const pipe of this.pipes) {
+      pipe.x -= this.horizontalSpeed;
+    }
+
     this.bird.applyAction(action, this.config);
 
-    if (checkCrash(this.bird, this.pipes, this.config)) {
+    if (checkCrash(this.bird, this.pipes, prevXs, this.config)) {
       this.bird.alive = false;
     }
 
-    // Point quand on vient de passer un tuyau
-    if (
-      this.bird.alive &&
-      this.pipes.length > 0 &&
-      this.bird.x === this.pipes[0].x + 1
-    ) {
-      this.score += 1;
+    if (this.bird.alive) {
+      for (const pipe of this.pipes) {
+        const prevX = prevXs.get(pipe.id) ?? pipe.x;
+        if (!pipe.scored && prevX >= this.bird.x && pipe.x < this.bird.x) {
+          pipe.scored = true;
+          this.score += 1;
+        }
+      }
     }
 
     this.pipes = prunePipes(this.pipes);
+    this.horizontalSpeed = currentHorizontalSpeed(this.score, this.config);
     return this.bird.alive;
   }
 
@@ -92,10 +104,10 @@ export class Game {
       lastAction: this.lastAction,
       dx,
       dy,
+      horizontalSpeed: this.horizontalSpeed,
     };
   }
 
-  /** Prochain tuyau devant l'oiseau (pour debug / AI). */
   getUpcomingPipe(): PipePair | null {
     const idx = closestUpcomingPipeIndex(this.pipes, this.bird.x);
     return idx >= 0 ? this.pipes[idx] : null;

@@ -1,13 +1,15 @@
+import { encodeState } from '../ai/StateEncoder';
+import type { QLearningAgent } from '../ai/QLearningAgent';
 import type { Action, GameSnapshot } from '../game/types';
 import { Controller } from './Controller';
 
-/**
- * Stub — sera branché sur QLearningAgent + QTable plus tard.
- * Pour l'instant renvoie Idle.
- */
 export class AIController extends Controller {
-  selectAction(_snapshot: GameSnapshot): Action {
-    return 0;
+  constructor(private readonly agent: QLearningAgent) {
+    super();
+  }
+
+  selectAction(snapshot: GameSnapshot, greedy = true): Action {
+    return this.agent.selectAction(encodeState(snapshot), greedy);
   }
 
   getAction(): Action {
@@ -15,7 +17,7 @@ export class AIController extends Controller {
   }
 
   reset(): void {
-    // no-op pour l'instant
+    // no-op
   }
 
   dispose(): void {

@@ -1,31 +1,23 @@
 import type { GameConfig, PipePair } from './types';
 
-/** Génère un couple de tuyaux avec un gap aléatoire. */
+let nextPipeId = 1;
+
 export function createRandomPipe(config: GameConfig, x?: number): PipePair {
-  const maxTop = config.height - config.pipeGap - 1;
+  const maxTop = Math.max(1, config.height - config.pipeGap - 1);
   const gapTop = 1 + Math.floor(Math.random() * maxTop);
   return {
+    id: nextPipeId++,
     x: x ?? config.width - 1,
     gapTop,
     gapBottom: gapTop + config.pipeGap,
+    scored: false,
   };
 }
 
-export function shiftPipes(pipes: PipePair[]): void {
-  for (const pipe of pipes) {
-    pipe.x -= 1;
-  }
-}
-
-/** Retire les tuyaux hors écran (x < 0). */
 export function prunePipes(pipes: PipePair[]): PipePair[] {
-  return pipes.filter((p) => p.x >= 0);
+  return pipes.filter((p) => p.x >= -1);
 }
 
-/**
- * Index du prochain tuyau devant l'oiseau (x >= birdX).
- * Utile pour dx / dy et la Q-table.
- */
 export function closestUpcomingPipeIndex(
   pipes: PipePair[],
   birdX: number,
@@ -40,4 +32,19 @@ export function closestUpcomingPipeIndex(
     }
   }
   return best;
+}
+
+/** Colonne intere attraversate da un tubo che si sposta verso sinistra. */
+export function sweptColumns(prevX: number, currX: number): number[] {
+  const cols: number[] = [];
+  const from = Math.ceil(currX);
+  const to = Math.floor(prevX);
+  for (let c = from; c <= to; c++) {
+    cols.push(c);
+  }
+  const occupied = Math.floor(currX + 1e-9);
+  if (!cols.includes(occupied)) {
+    cols.push(occupied);
+  }
+  return cols;
 }

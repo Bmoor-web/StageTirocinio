@@ -52,7 +52,6 @@ export function GameCanvas({ snapshot, config }: GameCanvasProps) {
       ctx.stroke();
     }
 
-    // Tuyaux
     for (const pipe of snapshot.pipes) {
       drawPipe(ctx, pipe.x, 0, pipe.gapTop, cellSize);
       drawPipe(ctx, pipe.x, pipe.gapBottom, height - pipe.gapBottom, cellSize);

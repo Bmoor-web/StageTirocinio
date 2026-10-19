@@ -3,29 +3,39 @@ export type Action = 0 | 1;
 
 export const ACTION_LABELS: Record<Action, string> = {
   0: 'Idle',
-  1: 'Flap',
+  1: 'Salto',
 };
 
-export type PlayMode = 'human' | 'ai';
+export type PlayMode = 'human' | 'qlearning' | 'dqn';
 
 export interface GameConfig {
   width: number;
   height: number;
   pipeGap: number;
+  /** Accelerazione verso il basso (celle / tick²) */
   gravity: number;
+  /** Velocità verticale imposta dal tasto Spazio (negativa = verso l'alto) */
   flapVelocity: number;
-  /** Taille d'une cellule à l'écran (px) */
   cellSize: number;
-  /** Intervalle entre deux ticks (ms) */
   tickMs: number;
+  /** Celle per tick all'inizio della partita */
+  baseHorizontalSpeed: number;
+  /** Incremento di velocità ogni `speedIncreaseEvery` punti */
+  speedDelta: number;
+  /** Ogni quanti punti aumenta la velocità orizzontale */
+  speedIncreaseEvery: number;
+  /** Tetto della velocità orizzontale */
+  maxHorizontalSpeed: number;
+  /** Distanza orizzontale tra due coppie di tubi */
+  pipeSpacing: number;
 }
 
 export interface PipePair {
+  id: number;
   x: number;
-  /** Y exclusif du haut du gap (tuyau haut occupe [0, gapTop)) */
   gapTop: number;
-  /** Y inclusif du bas du gap (tuyau bas occupe [gapBottom, height)) */
   gapBottom: number;
+  scored: boolean;
 }
 
 export interface BirdState {
@@ -40,16 +50,12 @@ export interface GameSnapshot {
   pipes: PipePair[];
   score: number;
   lastAction: Action;
-  /** Distances utiles pour le Q-learning (préparé dès maintenant) */
   dx: number;
   dy: number;
+  /** Velocità orizzontale corrente (celle / tick) */
+  horizontalSpeed: number;
 }
 
-/**
- * Aligné sur text_flappy_bird_logic.py (grille 20×15, gap 4).
- * flapVelocity / gravity légèrement adoucis pour le jeu humain ;
- * on pourra les recalibrer pour le Q-learning.
- */
 export const DEFAULT_CONFIG: GameConfig = {
   width: 20,
   height: 15,
@@ -58,4 +64,9 @@ export const DEFAULT_CONFIG: GameConfig = {
   flapVelocity: -2,
   cellSize: 28,
   tickMs: 140,
+  baseHorizontalSpeed: 1,
+  speedDelta: 0.15,
+  speedIncreaseEvery: 5,
+  maxHorizontalSpeed: 3,
+  pipeSpacing: 10,
 };

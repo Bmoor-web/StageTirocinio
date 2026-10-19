@@ -1,34 +1,34 @@
 import type { Bird } from './Bird';
+import { sweptColumns } from './Pipe';
 import type { GameConfig, PipePair } from './types';
 
 /**
- * Collision sol / plafond / tuyau — miroir de _check_crash() Python.
- * L'oiseau meurt s'il touche le sol, ou s'il est sur la colonne du tuyau
- * sans être dans le gap.
+ * Collisione suolo / tubo. Con velocità orizzontale > 1 il tubo può saltare
+ * delle colonne: si controlla tutto l'intervallo [x precedente, x attuale].
  */
 export function checkCrash(
   bird: Bird,
   pipes: PipePair[],
+  prevXs: Map<number, number>,
   config: GameConfig,
 ): boolean {
-  if (bird.y >= config.height) {
+  if (bird.y >= config.height - 0.01) {
     return true;
   }
 
+  const yCell = Math.min(config.height - 1, Math.floor(bird.y));
+
   for (const pipe of pipes) {
-    if (pipe.x !== bird.x) continue;
-    const inGap = bird.y >= pipe.gapTop && bird.y < pipe.gapBottom;
+    const prevX = prevXs.get(pipe.id) ?? pipe.x;
+    const cols = sweptColumns(prevX, pipe.x);
+    if (!cols.includes(bird.x)) continue;
+    const inGap = yCell >= pipe.gapTop && yCell < pipe.gapBottom;
     if (!inGap) return true;
   }
 
   return false;
 }
 
-/**
- * Distances à l'obstacle le plus proche (observation simple pour le RL) :
- * - dx : distance horizontale oiseau → tuyau
- * - dy : distance verticale oiseau → centre du gap
- */
 export function computeDistances(
   birdX: number,
   birdY: number,
@@ -36,7 +36,7 @@ export function computeDistances(
   pipeGap: number,
 ): { dx: number; dy: number } {
   const upcoming = pipes
-    .map((p, i) => ({ p, i, dx: p.x - birdX }))
+    .map((p) => ({ p, dx: p.x - birdX }))
     .filter((e) => e.dx >= 0)
     .sort((a, b) => a.dx - b.dx)[0];
 
@@ -44,9 +44,18 @@ export function computeDistances(
     return { dx: 0, dy: 0 };
   }
 
-  const gapCenter = upcoming.p.gapTop + Math.floor(pipeGap / 2);
+  const gapCenter = upcoming.p.gapTop + pipeGap / 2;
   return {
     dx: upcoming.dx,
     dy: birdY - gapCenter,
   };
+}
+
+export function currentHorizontalSpeed(
+  score: number,
+  config: GameConfig,
+): number {
+  const steps = Math.floor(score / Math.max(1, config.speedIncreaseEvery));
+  const speed = config.baseHorizontalSpeed + steps * config.speedDelta;
+  return Math.min(config.maxHorizontalSpeed, speed);
 }

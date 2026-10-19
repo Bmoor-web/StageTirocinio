@@ -1,4 +1,5 @@
 import type { PlayMode } from '../game/types';
+import { it } from '../i18n/it';
 
 interface ModeSelectorProps {
   mode: PlayMode;
@@ -7,7 +8,7 @@ interface ModeSelectorProps {
 
 export function ModeSelector({ mode, onChange }: ModeSelectorProps) {
   return (
-    <div className="btn-group mb-3" role="group" aria-label="Mode de jeu">
+    <div className="btn-group mb-3" role="group" aria-label={it.modeLabel}>
       <input
         type="radio"
         className="btn-check"
@@ -17,7 +18,7 @@ export function ModeSelector({ mode, onChange }: ModeSelectorProps) {
         onChange={() => onChange('human')}
       />
       <label className="btn btn-outline-primary" htmlFor="mode-human">
-        Humain
+        {it.human}
       </label>
 
       <input
@@ -25,12 +26,28 @@ export function ModeSelector({ mode, onChange }: ModeSelectorProps) {
         className="btn-check"
         name="mode"
         id="mode-ai"
-        checked={mode === 'ai'}
-        onChange={() => onChange('ai')}
+        checked={mode === 'qlearning'}
+        onChange={() => onChange('qlearning')}
+      />
+      <label className="btn btn-outline-success" htmlFor="mode-ai">
+        {it.qlearning}
+      </label>
+
+      <input
+        type="radio"
+        className="btn-check"
+        name="mode"
+        id="mode-dqn"
+        checked={mode === 'dqn'}
+        onChange={() => onChange('dqn')}
         disabled
       />
-      <label className="btn btn-outline-secondary" htmlFor="mode-ai" title="À venir">
-        IA (Q-learning) — bientôt
+      <label
+        className="btn btn-outline-secondary"
+        htmlFor="mode-dqn"
+        title={it.dqnSoon}
+      >
+        {it.dqn}
       </label>
     </div>
   );
