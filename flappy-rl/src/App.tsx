@@ -25,9 +25,8 @@ import {
 } from './game/types';
 import { it } from './i18n/it';
 
-const TRAIN_EPISODES = 400;
 const TRAIN_MAX_STEPS = 600;
-const TRAIN_CHUNK = 40;
+const TRAIN_CHUNK = 5;
 
 export default function App() {
   const gameRef = useRef<Game | null>(null);
@@ -36,7 +35,9 @@ export default function App() {
   const agentRef = useRef<QLearningAgent | null>(null);
   const bufferRef = useRef<ReplayBuffer | null>(null);
   const timerRef = useRef<number | null>(null);
+  const trainingTimeoutRef = useRef<number | null>(null);
   const runningRef = useRef(false);
+  const trainingRef = useRef(false);
   const modeRef = useRef<PlayMode>('human');
 
   const [mode, setMode] = useState<PlayMode>('human');
@@ -49,7 +50,9 @@ export default function App() {
     qlearning: 0,
     dqn: 0,
   });
-  const [training, setTraining] = useState(true);
+  const [training, setTraining] = useState(false);
+  const [episodeTarget, setEpisodeTarget] = useState(400);
+  const [trainingTarget, setTrainingTarget] = useState(0);
   const [trainProgress, setTrainProgress] = useState(0);
   const [trainStats, setTrainStats] = useState<TrainStats | null>(null);
   const trainStatsRef = useRef<TrainStats | null>(null);
@@ -65,6 +68,68 @@ export default function App() {
     runningRef.current = false;
     setRunning(false);
   }, []);
+
+  const stopTraining = useCallback(() => {
+    if (trainingTimeoutRef.current !== null) {
+      window.clearTimeout(trainingTimeoutRef.current);
+      trainingTimeoutRef.current = null;
+    }
+    trainingRef.current = false;
+    setTraining(false);
+    const agent = agentRef.current;
+    const buffer = bufferRef.current;
+    if (agent && buffer) {
+      saveTrainingCheckpoint(agent, buffer, trainStatsRef.current);
+    }
+  }, []);
+
+  const startTraining = useCallback(() => {
+    const agent = agentRef.current;
+    const buffer = bufferRef.current;
+    if (!agent || !buffer || trainingRef.current) return;
+
+    const target = Math.min(100000, Math.max(1, Math.floor(episodeTarget)));
+    trainingRef.current = true;
+    setTraining(true);
+    setTrainProgress(0);
+    setTrainingTarget(target);
+    agent.resetExploration();
+    let completed = 0;
+    let cumulativeStats = trainStatsRef.current;
+
+    const runChunk = () => {
+      if (!trainingRef.current) return;
+      const count = Math.min(TRAIN_CHUNK, target - completed);
+      const stats = trainQLearning(agent, buffer, {
+        episodes: count,
+        maxSteps: TRAIN_MAX_STEPS,
+        config: DEFAULT_CONFIG,
+      });
+      completed += count;
+      setTrainProgress(completed);
+      cumulativeStats = {
+        episodes: (cumulativeStats?.episodes ?? 0) + stats.episodes,
+        steps: (cumulativeStats?.steps ?? 0) + stats.steps,
+        bestScore: Math.max(cumulativeStats?.bestScore ?? 0, stats.bestScore),
+        lastScore: stats.lastScore,
+        tableSize: stats.tableSize,
+      };
+      trainStatsRef.current = cumulativeStats;
+      setTrainStats(cumulativeStats);
+      saveTrainingCheckpoint(agent, buffer, cumulativeStats);
+
+      if (completed >= target) {
+        agent.hp.epsilon = 0.02;
+        trainingRef.current = false;
+        trainingTimeoutRef.current = null;
+        setTraining(false);
+      } else {
+        trainingTimeoutRef.current = window.setTimeout(runChunk, 0);
+      }
+    };
+
+    trainingTimeoutRef.current = window.setTimeout(runChunk, 0);
+  }, [episodeTarget]);
 
   const noteRecord = useCallback((playMode: PlayMode, score: number) => {
     if (playMode === 'dqn') return;
@@ -181,45 +246,11 @@ export default function App() {
     aiRef.current = ai;
     setSnapshot(game.snapshot());
 
-    let cancelled = false;
-    let done = 0;
-    let cumulativeStats = trainStatsRef.current;
-    const runChunk = () => {
-      if (cancelled) return;
-      const remaining = TRAIN_EPISODES - done;
-      if (remaining <= 0) {
-        setTraining(false);
-        return;
-      }
-      const n = Math.min(TRAIN_CHUNK, remaining);
-      const stats = trainQLearning(agent, buffer, {
-        episodes: n,
-        maxSteps: TRAIN_MAX_STEPS,
-        config: DEFAULT_CONFIG,
-      });
-      done += n;
-      setTrainProgress(Math.round((done / TRAIN_EPISODES) * 100));
-      cumulativeStats = {
-        episodes: (cumulativeStats?.episodes ?? 0) + stats.episodes,
-        steps: (cumulativeStats?.steps ?? 0) + stats.steps,
-        bestScore: Math.max(cumulativeStats?.bestScore ?? 0, stats.bestScore),
-        lastScore: stats.lastScore,
-        tableSize: stats.tableSize,
-      };
-      trainStatsRef.current = cumulativeStats;
-      setTrainStats(cumulativeStats);
-      saveTrainingCheckpoint(agent, buffer, cumulativeStats);
-      if (done >= TRAIN_EPISODES) {
-        agent.hp.epsilon = 0.02;
-        setTraining(false);
-      } else {
-        window.setTimeout(runChunk, 0);
-      }
-    };
-    window.setTimeout(runChunk, 0);
-
     return () => {
-      cancelled = true;
+      trainingRef.current = false;
+      if (trainingTimeoutRef.current !== null) {
+        window.clearTimeout(trainingTimeoutRef.current);
+      }
       if (timerRef.current !== null) window.clearInterval(timerRef.current);
       human.dispose();
     };
@@ -255,7 +286,12 @@ export default function App() {
 
       {training && (
         <div className="alert alert-info py-2">
-          {it.training}: {it.trainingRun} {trainProgress}%
+          {it.training}: {it.trainingRun} {trainProgress}/{episodeTarget}
+        </div>
+      )}
+      {!training && trainProgress > 0 && trainProgress < trainingTarget && (
+        <div className="alert alert-warning py-2">
+          {it.trainingStopped}: {trainProgress}/{trainingTarget}
         </div>
       )}
       {!training && trainStats && (
@@ -267,10 +303,49 @@ export default function App() {
         </div>
       )}
 
+      <div className="d-flex flex-wrap gap-2 align-items-end justify-content-center mb-3">
+        <div>
+          <label className="form-label small mb-1" htmlFor="training-episodes">
+            {it.episodeTarget}
+          </label>
+          <input
+            id="training-episodes"
+            className="form-control form-control-sm"
+            type="number"
+            min={1}
+            max={100000}
+            step={100}
+            value={episodeTarget}
+            onChange={(event) =>
+              setEpisodeTarget(
+                Math.min(100000, Math.max(1, Number(event.target.value) || 1)),
+              )
+            }
+            disabled={training}
+          />
+        </div>
+        <button
+          type="button"
+          className="btn btn-sm btn-success"
+          onClick={startTraining}
+          disabled={training}
+        >
+          {it.startTraining}
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-danger"
+          onClick={stopTraining}
+          disabled={!training}
+        >
+          {it.stopTraining}
+        </button>
+      </div>
+
       <RecordsBar records={records} />
 
       <div className="text-center">
-        <ModeSelector mode={mode} onChange={changeMode} />
+        <ModeSelector mode={mode} onChange={changeMode} disabled={training} />
       </div>
 
       <Score
@@ -304,7 +379,7 @@ export default function App() {
         draft={configDraft}
         onChange={setConfigDraft}
         onApply={restart}
-        disabled={running}
+        disabled={running || training}
       />
     </div>
   );

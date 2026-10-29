@@ -61,7 +61,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   height: 15,
   pipeGap: 4,
   gravity: 1,
-  flapVelocity: -2,
+  flapVelocity: -1,
   cellSize: 28,
   tickMs: 140,
   baseHorizontalSpeed: 1,

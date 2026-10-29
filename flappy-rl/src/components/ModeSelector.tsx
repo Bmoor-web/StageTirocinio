@@ -4,9 +4,10 @@ import { it } from '../i18n/it';
 interface ModeSelectorProps {
   mode: PlayMode;
   onChange: (mode: PlayMode) => void;
+  disabled?: boolean;
 }
 
-export function ModeSelector({ mode, onChange }: ModeSelectorProps) {
+export function ModeSelector({ mode, onChange, disabled = false }: ModeSelectorProps) {
   return (
     <div className="btn-group mb-3" role="group" aria-label={it.modeLabel}>
       <input
@@ -14,6 +15,7 @@ export function ModeSelector({ mode, onChange }: ModeSelectorProps) {
         className="btn-check"
         name="mode"
         id="mode-human"
+        disabled={disabled}
         checked={mode === 'human'}
         onChange={() => onChange('human')}
       />
@@ -26,6 +28,7 @@ export function ModeSelector({ mode, onChange }: ModeSelectorProps) {
         className="btn-check"
         name="mode"
         id="mode-ai"
+        disabled={disabled}
         checked={mode === 'qlearning'}
         onChange={() => onChange('qlearning')}
       />

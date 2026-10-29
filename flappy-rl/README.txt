@@ -71,7 +71,8 @@ Altri comandi:
 Come si gioca
 -------------
 - Modalità Umano: Spazio, freccia su o W per saltare (flap).
-- Gravità e spinta sono modificabili nel pannello parametri.
+- Gravità e spinta sono modificabili nel pannello parametri. La spinta
+  predefinita è 1 per rendere il controllo più accessibile.
 - La velocità orizzontale aumenta di un delta parametrizzabile ogni N punti
   (come il T-Rex di Chrome).
 - I record umano e Q-learning restano in memoria finché la scheda del browser
@@ -79,8 +80,10 @@ Come si gioca
 
 Intelligenza artificiale
 ------------------------
-Al caricamento della pagina viene eseguito un addestramento Q-learning
-completamente in JavaScript:
+L'addestramento Q-learning si avvia manualmente dal pannello dedicato:
+si sceglie il numero di episodi, l'agente riavvia automaticamente la partita
+tra un episodio e il successivo e l'utente può interrompere il processo.
+Il training procede in piccoli blocchi per mantenere reattiva l'interfaccia.
 
   stato  = altezza uccello, dx, dy, velocità verticale (discretizzati)
   azione = Idle (0) oppure Salto (1)
@@ -94,7 +97,7 @@ tabellare aggiorna la Q-table online tramite Bellman.
 Per cancellare il modello salvato e ripartire da zero, eseguire nella console
 del browser:
 
-  localStorage.removeItem('flappy-rl-training-v1')
+  localStorage.removeItem('flappy-rl-training-v2')
 
 Poi ricaricare la pagina.
 

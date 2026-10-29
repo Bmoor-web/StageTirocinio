@@ -2,7 +2,7 @@ import type { QLearningAgent } from './QLearningAgent';
 import type { ReplayBuffer } from './ReplayBuffer';
 import type { TrainStats } from './types';
 
-const STORAGE_KEY = 'flappy-rl-training-v1';
+const STORAGE_KEY = 'flappy-rl-training-v2';
 
 export interface TrainingCheckpoint {
   table: unknown;
